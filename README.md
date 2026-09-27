@@ -107,11 +107,11 @@ Hasil pengujian akan dicantumkan setelah implementasi selesai.
 
 ## Pengembang
 
-- Nama: [Sintya Shavna Tamawulan]
-- NRP: [5024241047]
-- Program Studi: [Teknik Komputer]
+- Nama: Sintya Shavna Tamawulan
+- NRP: 5024241047
+- Program Studi: Teknik Komputer
 - Mata Kuliah: Pengolahan Citra Video
-- Dosen Pengampu: [Artha Kusuma]
+- Dosen Pengampu: Artha Kusuma
 
 ## Status Proyek
 
