@@ -1,113 +1,121 @@
 
-import sys
-import time
 import cv2
-
 from hand_tracking import Camera, HandTracker
 
 
 def main():
-    use_hand = "--hand" in sys.argv
+    camera = Camera(
+        index=0,
+        width=640,
+        height=480,
+        mirror=True
+    )
 
-    cam = Camera(index=1, width=640, height=480)
-    tracker = None
+    tracker = HandTracker()
+    window_name = "Fruity Catch - Kalibrasi Warna"
+
+    mouse_data = {"frame": None}
+
+    def on_mouse(event, x, y, flags, param):
+        if event != cv2.EVENT_LBUTTONDOWN:
+            return
+
+        frame = param["frame"]
+
+        if frame is None:
+            print("Frame kamera belum tersedia. Coba klik lagi.")
+            return
+
+        success = tracker.calibrate(frame, x, y)
+
+        if success:
+            color = tracker.target_color
+            print(
+                "Kalibrasi berhasil! "
+                f"HSV = ({int(color[0])}, "
+                f"{int(color[1])}, {int(color[2])})"
+            )
+        else:
+            print("Kalibrasi gagal. Coba klik bagian target lagi.")
 
     try:
-        cam.open()
-        print("Webcam berhasil dibuka.")
-        print("Tekan 'q' atau ESC untuk keluar.")
+        camera.open()
 
-        if use_hand:
-            tracker = HandTracker(max_hands=1)
-            print("Deteksi tangan aktif.")
-        else:
-            print("Mode webcam saja.")
-            print("Gunakan: python test_webcam.py --hand")
+        cv2.namedWindow(window_name)
+        cv2.setMouseCallback(
+            window_name,
+            on_mouse,
+            mouse_data
+        )
 
-        prev_time = time.time()
+        print("=" * 45)
+        print("FRUITY CATCH - TES DETEKSI WARNA")
+        print("=" * 45)
+        print("1. Klik bagian tengah sarung tangan.")
+        print("2. Gerakkan tangan untuk menguji deteksi.")
+        print("3. Tekan C untuk menghapus kalibrasi.")
+        print("4. Klik target lagi untuk kalibrasi ulang.")
+        print("5. Tekan Q atau ESC untuk keluar.")
+        print("=" * 45)
 
         while True:
-            ok, frame = cam.read()
+            success, frame = camera.read()
 
-            if not ok:
-                print("Gagal membaca frame dari webcam.")
+            if not success:
+                print("Gagal membaca frame webcam.")
                 break
 
-            status = "Mode webcam saja"
+            mouse_data["frame"] = frame.copy()
 
-            if tracker is not None:
-                frame = tracker.process(frame)
+            result = tracker.process(frame, draw=True)
 
-                if tracker.has_hand():
-                    landmarks = tracker.get_landmarks(frame.shape)
-                    fingers = tracker.fingers_up(landmarks)
+            if tracker.target_color is None:
+                cv2.putText(
+                    result,
+                    "Klik warna target untuk kalibrasi",
+                    (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    (0, 255, 255),
+                    2
+                )
+            else:
+                cv2.putText(
+                    result,
+                    "Klik target untuk kalibrasi ulang",
+                    (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (255, 255, 255),
+                    1
+                )
 
+            cv2.imshow(window_name, result)
 
-                    extended_fingers = sum(fingers[1:])
+            mask = tracker.get_mask()
 
-                    if extended_fingers >= 4:
-                        status = "TANGAN TERBUKA"
-                    elif extended_fingers == 0:
-                        status = "TANGAN MENGEPAL"
-                    else:
-                        status = f"GESTURE LAIN: {fingers}"
-
-                    cv2.putText(
-                        frame,
-                        f"Jari: {fingers}",
-                        (10, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (255, 255, 0),
-                        2
-                    )
-                else:
-                    status = "Tangan tidak terdeteksi"
-
-            now = time.time()
-            fps = 1.0 / max(now - prev_time, 1e-6)
-            prev_time = now
-
-            cv2.putText(
-                frame,
-                status,
-                (10, 60),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 255),
-                2
-            )
-
-            cv2.putText(
-                frame,
-                f"FPS: {fps:.1f}",
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 0),
-                2
-            )
-
-            cv2.imshow("Tes Webcam dan Gesture", frame)
+            if mask is not None:
+                cv2.imshow("Mask Deteksi", mask)
 
             key = cv2.waitKey(1) & 0xFF
 
-            if key == ord("q") or key == 27:
+            if key == ord("c"):
+                tracker.reset_calibration()
+                print(
+                    "Kalibrasi dihapus. "
+                    "Klik warna target untuk kalibrasi ulang."
+                )
+
+            elif key == ord("q") or key == 27:
                 break
 
-    except KeyboardInterrupt:
-        print("\nProgram dihentikan oleh pengguna.")
-
-    except Exception as e:
-        print(f"Terjadi error: {e}")
+    except RuntimeError as error:
+        print(f"Error kamera: {error}")
 
     finally:
-        if tracker is not None:
-            tracker.close()
-
-        cam.release()
+        camera.release()
+        tracker.close()
         cv2.destroyAllWindows()
-        print("Kamera ditutup.")
 
 
 if __name__ == "__main__":
